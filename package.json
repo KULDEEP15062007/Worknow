@@ -1,0 +1,1 @@
+{"name":"worknow","version":"1.0.0","private":true,"description":"WorkNow - hyperlocal services for Uttarakhand","main":"server.js","scripts":{"start":"node server.js","test":"node test.js"},"engines":{"node":">=18"}}
