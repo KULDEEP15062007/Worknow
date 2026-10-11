@@ -34,6 +34,17 @@ function unsign(t){const [b,s]=String(t||'').split('.');if(!b||!s)return null;co
 class HttpErr extends Error{constructor(c,m){super(m);this.code=c}}
 const bad=(c,m)=>{throw new HttpErr(c,m)};
 const today=()=>new Date().toDateString();
+/* SERVICE AREA (like Rapido's city geofence): pickup and drop must be within AREA_KM of a district town, and each vehicle has a maximum trip length */
+const AREA_KM=70,MAXKM={10:25,11:30,12:100,13:60,15:40};
+const nearestDist=(lat,lng)=>{let b=null,m=1e9;for(const n in DC){const d=hav(lat,lng,DC[n][0],DC[n][1]);if(d<m){m=d;b=n}}return{name:b,km:m}};
+const inArea=(lat,lng)=>inUK(lat,lng)&&nearestDist(lat,lng).km<=AREA_KM;
+const AREA_MSG='Service is not available at this location. We work only around Uttarakhand towns.';
+/* WHERE EACH SERVICE RUNS (admin can change this in the Admin screen). Default: bike taxi + auto only in the plains/major towns. */
+const PLAIN=['Dehradun','Haridwar','Udham Singh Nagar','Nainital'],REQUIRE=process.env.REQUIRE_APPROVAL==='1';
+const getAvail=()=>db.avail||(db.avail={10:PLAIN.slice(),11:PLAIN.slice()});
+const availOK=(id,d)=>{const a=getAvail()[id];return !a||a.includes(d)};
+const NA=(svc,d)=>`${svc.en} is not available in ${d} yet`;
+const isApproved=u=>u.approved!==false;
 const priceOf=(svc,d,km)=>{if(svc.kind!=='km'){const t=Math.round(svc.base*(DIST[d]-1)*.5/5)*5;return{base:svc.base,dist:0,terrain:t,fare:svc.base+t}}const road=svc.perKm*km,t=Math.round(road*(DIST[d]-1)*.5);return{base:svc.base,dist:Math.round(road),terrain:t,fare:Math.max(svc.minFare,Math.round(svc.base+road+t))}};
 const radiusKm=o=>{const a=(Date.now()-o.at)/1000;return a<30?3:a<60?6:a<90?10:15}; /* search widens: 3 km, 6, 10, then 15 */
 const freshLoc=u=>!!(u&&u.loc&&Date.now()-u.loc.at<120000);
@@ -75,17 +86,18 @@ route('POST','/api/auth/verify',null,(c)=>{const {phone:ph,otp,name,role,distric
  if(!e||e.exp<Date.now())bad(400,'OTP expired');if(++e.tries>5){delete db.otps[ph];bad(429,'Too many wrong OTPs')}if(!eq(e.h,sha(ph+otp))){save();bad(400,'Wrong OTP')}
  if(!['cust','cap','admin'].includes(role))bad(400,'Invalid role');if(role==='admin'&&!eq(adminKey||'',ADMIN_KEY))bad(403,'Admin key required');
  if(district&&!DIST[district])bad(400,'Unknown district');delete db.otps[ph];
- const u=db.users[ph]=Object.assign(db.users[ph]||{phone:ph,created:Date.now()},{name:String(name||'User').slice(0,40),district:district||db.users[ph]?.district||'Dehradun'});
- u.roles=[...new Set([...(u.roles||[]),role])];save();
+ const isNew=!db.users[ph];const u=db.users[ph]=Object.assign(db.users[ph]||{phone:ph,created:Date.now()},{name:String(name||'User').slice(0,40),district:district||db.users[ph]?.district||'Dehradun'});
+ u.roles=[...new Set([...(u.roles||[]),role])];if(role==='cap'&&isNew)u.approved=!REQUIRE;save();
  return{token:sign({ph,role,exp:Date.now()+30*864e5}),user:{phone:ph,name:u.name,district:u.district,role}}});
 
 /* customer */
 route('POST','/api/orders',['cust'],(c)=>{const {serviceId,address,when,pay,district}=c.body;const svc=SERVICES[serviceId];if(!svc)bad(400,'Unknown service');
- const d=district||db.users[c.ph].district;if(!DIST[d])bad(400,'Unknown district');if(!String(address||'').trim())bad(400,'Address required');
+ let d=district||db.users[c.ph].district;if(!DIST[d])bad(400,'Unknown district');if(!String(address||'').trim())bad(400,'Address required');
  if(db.orders.some(o=>o.cust===c.ph&&['search','accepted','arrived','started'].includes(o.st)))bad(409,'You already have an active booking');
  limit('book'+c.ph,10,3600000);
- let lat=+c.body.lat,lng=+c.body.lng;if(c.body.lat==null||c.body.lng==null){lat=DC[d][0];lng=DC[d][1]}else if(!inUK(lat,lng))bad(400,'Service is only available in Uttarakhand');
- let km=0,dLat,dLng;if(svc.kind==='km'){dLat=+c.body.dLat;dLng=+c.body.dLng;if(!inUK(dLat,dLng))bad(400,'Choose a drop location inside Uttarakhand');km=roadKm(lat,lng,dLat,dLng);if(km<0.2)bad(400,'Drop is too close to pickup')}
+ let lat=+c.body.lat,lng=+c.body.lng;if(c.body.lat==null||c.body.lng==null){lat=DC[d][0];lng=DC[d][1]}else{if(!inArea(lat,lng))bad(400,AREA_MSG);d=nearestDist(lat,lng).name}
+ if(!availOK(svc.id,d))bad(400,NA(svc,d));
+ let km=0,dLat,dLng;if(svc.kind==='km'){dLat=+c.body.dLat;dLng=+c.body.dLng;if(!inArea(dLat,dLng))bad(400,AREA_MSG);km=roadKm(lat,lng,dLat,dLng);if(km>MAXKM[svc.id])bad(400,`Trip too long. Maximum ${MAXKM[svc.id]} km for ${svc.en}`);if(km<0.2)bad(400,'Drop is too close to pickup')}
  const p=priceOf(svc,d,km);
  const o={id:'WN'+crypto.randomInt(10000,99999),sid:svc.id,svc:svc.en,base:p.base,dist:p.dist,terrain:p.terrain,fare:p.fare,km,dlat:dLat,dlng:dLng,daddr:String(c.body.daddr||'').slice(0,200),d,addr:String(address).slice(0,200),when:['Now','Today evening','Tomorrow'].includes(when)?when:'Now',pay:pay==='Cash'?'Cash':'UPI',cust:c.ph,lat,lng,st:'search',otp:String(crypto.randomInt(1000,10000)),otpTries:0,at:Date.now(),skip:[]};
  db.orders.unshift(o);save();return view(o,'cust')});
@@ -97,9 +109,9 @@ route('POST','/api/orders/:id/rate',['cust'],c=>{const o=find(c,'cust');if(o.st!
 function find(c,role){const o=db.orders.find(x=>x.id===c.params.id);if(!o)bad(404,'Order not found');if(role==='cust'&&o.cust!==c.ph)bad(403,'Not your order');if(role==='cap'&&o.cap!==c.ph)bad(403,'Not your job');return o}
 
 /* captain */
-route('POST','/api/captain/online',['cap'],c=>{const u=db.users[c.ph];u.online=!!c.body.online;if(c.body.district&&DIST[c.body.district])u.district=c.body.district;save();return{online:u.online,district:u.district}});
-route('POST','/api/quote',['cust'],c=>{const svc=SERVICES[c.body.serviceId];if(!svc)bad(400,'Unknown service');const d=DIST[c.body.district]?c.body.district:db.users[c.ph].district;let km=0;
- if(svc.kind==='km'){if(!inUK(+c.body.lat,+c.body.lng)||!inUK(+c.body.dLat,+c.body.dLng))bad(400,'Service is only available in Uttarakhand');km=roadKm(+c.body.lat,+c.body.lng,+c.body.dLat,+c.body.dLng)}return Object.assign({km},priceOf(svc,d,km))});
+route('POST','/api/captain/online',['cap'],c=>{const u=db.users[c.ph];if(c.body.online&&!isApproved(u))bad(403,'Your captain account is waiting for approval');u.online=!!c.body.online;if(c.body.district&&DIST[c.body.district])u.district=c.body.district;save();return{online:u.online,district:u.district}});
+route('POST','/api/quote',['cust'],c=>{const svc=SERVICES[c.body.serviceId];if(!svc)bad(400,'Unknown service');let d=DIST[c.body.district]?c.body.district:db.users[c.ph].district;let km=0;
+ if(svc.kind==='km'){if(inArea(+c.body.lat,+c.body.lng))d=nearestDist(+c.body.lat,+c.body.lng).name;if(!inArea(+c.body.lat,+c.body.lng)||!inArea(+c.body.dLat,+c.body.dLng))bad(400,AREA_MSG);km=roadKm(+c.body.lat,+c.body.lng,+c.body.dLat,+c.body.dLng);if(km>MAXKM[svc.id])bad(400,`Trip too long. Maximum ${MAXKM[svc.id]} km for ${svc.en}`)}if(!availOK(svc.id,d))bad(400,NA(svc,d));return Object.assign({km},priceOf(svc,d,km))});
 /* offers = only jobs near the captain's live GPS, nearest first (radius 3 km -> 6 -> 10 -> 15 as the search ages) */
 route('GET','/api/captain/offers',['cap'],c=>{const u=db.users[c.ph];if(!u.online||activeJob(c.ph)||!freshLoc(u))return[];
  return db.orders.filter(o=>o.st==='search'&&!o.skip.includes(c.ph)).map(o=>({o,d:hav(u.loc.lat,u.loc.lng,o.lat,o.lng)})).filter(x=>x.d<=radiusKm(x.o)).sort((a,b)=>a.d-b.d).slice(0,5).map(x=>Object.assign(view(x.o,'cap'),{distKm:+x.d.toFixed(1)}))});
@@ -116,7 +128,7 @@ route('GET','/api/captain/earnings',['cap'],c=>{const mine=db.ledger.filter(l=>l
  const days=[...Array(7)].map((_,i)=>{const d=new Date(Date.now()-(6-i)*864e5).toDateString();return{day:d,earned:mine.filter(l=>l.day===d).reduce((a,b)=>a+b.net,0)}});
  return{today:days[6].earned,total:mine.reduce((a,b)=>a+b.net,0),jobs:mine.filter(l=>l.type==='job').length,days}});
 
-route('GET','/api/me',['cust','cap','admin'],c=>{const u=db.users[c.ph];return{phone:u.phone,name:u.name,district:u.district,online:!!u.online,role:c.role}});
+route('GET','/api/me',['cust','cap','admin'],c=>{const u=db.users[c.ph];return{phone:u.phone,name:u.name,district:u.district,online:!!u.online,approved:isApproved(u),role:c.role}});
 route('POST','/api/captain/location',['cap'],c=>{const lat=+c.body.lat,lng=+c.body.lng;if(!inUK(lat,lng))bad(400,'Location outside Uttarakhand');limit('loc'+c.ph,60,60000);db.users[c.ph].loc={lat,lng,at:Date.now()};return{ok:true}});
 route('GET','/api/orders/:id/track',['cust'],c=>{const o=find(c,'cust');const u=o.cap&&db.users[o.cap];const live=u&&u.loc&&Date.now()-u.loc.at<120000&&['accepted','arrived','started'].includes(o.st);return{status:o.st,job:{lat:o.lat,lng:o.lng},captain:live?{lat:u.loc.lat,lng:u.loc.lng,at:u.loc.at}:null}});
 route('GET','/api/captains/nearby',['cust'],c=>{const d=c.q.district||db.users[c.ph].district;return Object.values(db.users).filter(u=>u.online&&u.district===d&&u.loc&&Date.now()-u.loc.at<120000).slice(0,30).map(u=>({lat:+u.loc.lat.toFixed(3),lng:+u.loc.lng.toFixed(3)}))});
@@ -127,6 +139,11 @@ route('POST','/api/rooms',['cust','cap'],c=>{const {title,rent,type,district}=c.
 route('POST','/api/rooms/:id/contact',['cust','cap'],c=>{const r=db.rooms.find(x=>x.id===c.params.id);if(!r)bad(404,'Room not found');return{message:'Owner will call you back',ownerPhone:'+91'+r.phone.slice(0,2)+'XXXXXX'+r.phone.slice(-2)}});
 route('DELETE','/api/rooms/:id',['cust','cap'],c=>{const i=db.rooms.findIndex(x=>x.id===c.params.id&&x.phone===c.ph);if(i<0)bad(404,'Not found');db.rooms.splice(i,1);save();return{ok:true}});
 
+route('GET','/api/availability',null,()=>getAvail());
+route('GET','/api/admin/availability',['admin'],()=>{const a=getAvail(),o={};SERVICES.forEach(s=>o[s.id]=a[s.id]||Object.keys(DIST));return o});
+route('POST','/api/admin/availability',['admin'],c=>{const {serviceId,district,on}=c.body;if(!SERVICES[serviceId]||!DIST[district])bad(400,'Bad input');const a=getAvail();let l=a[serviceId]||Object.keys(DIST);l=on?[...new Set([...l,district])]:l.filter(x=>x!==district);if(l.length===Object.keys(DIST).length)delete a[serviceId];else a[serviceId]=l;save();return{ok:true}});
+route('GET','/api/admin/captains',['admin'],()=>Object.values(db.users).filter(u=>(u.roles||[]).includes('cap')&&u.phone!=='bot').map(u=>({phone:u.phone,name:u.name,district:u.district,approved:isApproved(u),online:!!u.online})));
+route('POST','/api/admin/captain',['admin'],c=>{const u=db.users[c.body.phone];if(!u)bad(404,'Not found');u.approved=!!c.body.approved;if(!u.approved)u.online=false;save();return{ok:true}});
 /* admin: the only place commission is visible */
 route('GET','/api/admin/stats',['admin'],()=>{const L=db.ledger,by={};L.forEach(l=>by[l.d]=(by[l.d]||0)+l.comm);
  return{commissionPct:COMMISSION*100,gmv:L.reduce((a,b)=>a+b.fare,0),commission:L.reduce((a,b)=>a+b.comm,0),payouts:L.reduce((a,b)=>a+b.net,0),completed:L.filter(l=>l.type==='job').length,activeOrders:db.orders.filter(o=>['search','accepted','arrived','started'].includes(o.st)).length,captainsOnline:Object.values(db.users).filter(u=>u.online).length,byDistrict:by}});

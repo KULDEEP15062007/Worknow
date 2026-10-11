@@ -63,7 +63,7 @@ table{width:100%;font-size:12px;border-collapse:collapse}td,th{padding:6px 3px;b
 /* WorkNow web app: talks to the real API (same origin) */
 const $=s=>document.querySelector(s);
 let lang=localStorage.getItem('wn_l')||'en';
-Object.assign(HI,{'Allow location access':'लोकेशन की अनुमति दें','Use my location':'मेरी लोकेशन','Work location = map pin. Move the map to set it.':'काम की जगह = नक्शे का पिन। नक्शा खिसकाकर चुनें।','Captain is live on map':'कैप्टन नक्शे पर लाइव है','Admin key':'एडमिन की','Name':'नाम','Continue':'आगे बढ़ें','Server error, try again':'सर्वर में दिक्कत, फिर कोशिश करें','Change':'बदलें','Open':'खुला','Choose':'चुनें','Map':'नक्शा','Captains nearby':'पास में कैप्टन','Pick work location':'काम की जगह चुनें','Confirm location':'लोकेशन पक्की करें','Location set':'लोकेशन तय हो गई','Move the map under the pin':'नक्शा खिसकाकर पिन सही जगह लाएँ','Change on map':'नक्शे पर बदलें','Your GPS location':'आपकी GPS लोकेशन','Map pin':'नक्शे का पिन','District centre':'ज़िले का केंद्र','Drop location':'ड्रॉप लोकेशन','Choose on map':'नक्शे पर चुनें','Drop address / landmark':'ड्रॉप का पता / लैंडमार्क','Choose drop on map first':'पहले नक्शे पर ड्रॉप चुनें','Service is only in Uttarakhand':'सेवा सिर्फ़ उत्तराखंड में है','km away':'किमी दूर','Estimated distance':'अनुमानित दूरी','Turn on location to get jobs':'काम पाने के लिए लोकेशन चालू करें','Pickup location':'पिकअप लोकेशन'});
+Object.assign(HI,{'Allow location access':'लोकेशन की अनुमति दें','Use my location':'मेरी लोकेशन','Work location = map pin. Move the map to set it.':'काम की जगह = नक्शे का पिन। नक्शा खिसकाकर चुनें।','Captain is live on map':'कैप्टन नक्शे पर लाइव है','Admin key':'एडमिन की','Name':'नाम','Continue':'आगे बढ़ें','Server error, try again':'सर्वर में दिक्कत, फिर कोशिश करें','Change':'बदलें','Open':'खुला','Choose':'चुनें','Map':'नक्शा','Captains nearby':'पास में कैप्टन','Pick work location':'काम की जगह चुनें','Confirm location':'लोकेशन पक्की करें','Location set':'लोकेशन तय हो गई','Move the map under the pin':'नक्शा खिसकाकर पिन सही जगह लाएँ','Change on map':'नक्शे पर बदलें','Your GPS location':'आपकी GPS लोकेशन','Map pin':'नक्शे का पिन','District centre':'ज़िले का केंद्र','Drop location':'ड्रॉप लोकेशन','Choose on map':'नक्शे पर चुनें','Drop address / landmark':'ड्रॉप का पता / लैंडमार्क','Choose drop on map first':'पहले नक्शे पर ड्रॉप चुनें','Service is only in Uttarakhand':'सेवा सिर्फ़ उत्तराखंड में है','km away':'किमी दूर','Estimated distance':'अनुमानित दूरी','Turn on location to get jobs':'काम पाने के लिए लोकेशन चालू करें','Pickup location':'पिकअप लोकेशन','Not available here':'यहाँ उपलब्ध नहीं','Not available in':'उपलब्ध नहीं:','Waiting for admin approval':'एडमिन की मंज़ूरी का इंतज़ार'});
 const t=k=>(lang==='hi'&&HI[k])||k;
 const DAYS={en:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],hi:['रवि','सोम','मंगल','बुध','गुरु','शुक्र','शनि']};
 let tok=localStorage.getItem('wn_tok'),U=null,DISTS=[],SVC=[],tab='home',cf='All',q='',rf='All',rd='my',bw='Now',bp='UPI',sig='',ls=1,LR='cust',LP='',LN='',LD='Dehradun',ORD=[],ACT=null,OFFERS=[],JOB=null,online=false,myPos=null,gpsId=null,tickN=0,fitKey='';
@@ -134,7 +134,7 @@ async function routeTo(a,b){if(!map||!a||!b)return;const key=[a.lat.toFixed(3),a
 function clearRoute(){routeKey='';ROUTE=null;if(!map)return;if(useG){routeLine&&routeLine.setMap(null);routeLine=null}else if(map.getSource&&map.getSource('route'))map.getSource('route').setData({type:'FeatureCollection',features:[]})}
 function locate(cb){if(!navigator.geolocation){toast(t('Allow location access'));return}navigator.geolocation.getCurrentPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude};paintMe();flyTo(myPos.lng,myPos.lat,15);cb&&cb()},()=>toast(t('Allow location access')),{enableHighAccuracy:true,timeout:9000})}
 const inUK=(a,b)=>a>28.6&&a<31.6&&b>77.4&&b<81.2;
-let DROP=null,QUOTE=null,pickFor={type:'pick',svc:null};
+let AV={},avSel=10,DROP=null,QUOTE=null,pickFor={type:'pick',svc:null};
 function startPick(type,svc){pickFor={type:type||'pick',svc:svc==null?null:svc};pickMode=true;go('map')}
 function confirmPick(){const p=getC();if(!p||!inUK(p.lat,p.lng)){toast(t('Service is only in Uttarakhand'));return}if(pickFor.type==='drop')DROP=p;else PICK=p;QUOTE=null;pickMode=false;go('home');toast(t('Location set'));if(pickFor.svc!=null)setTimeout(()=>book(pickFor.svc),250)}
 function mapCard(){if(ACT)return live();
@@ -160,7 +160,7 @@ async function verify(){const otp=otpVal();if(otp.length<4){toast(t('Enter 10 di
  try{const r=await api('POST','/api/auth/verify',{phone:LP,otp,name:LN||'User',role:LR,district:LD,adminKey:$('#ak')?$('#ak').value:undefined});tok=r.token;U={phone:r.user.phone,name:r.user.name,d:r.user.district,role:r.user.role};save();ls=1;boot()}catch(e){fail(e)}}
 function save(){localStorage.setItem('wn_tok',tok);localStorage.setItem('wn_user',JSON.stringify(U))}
 function doLogout(){online=false;stopGps();tok=null;U=null;localStorage.removeItem('wn_tok');localStorage.removeItem('wn_user');ls=1;login()}
-async function boot(){tab=U.role==='cust'?'home':U.role==='cap'?'duty':'ad';sig='';try{const m=await api('GET','/api/me');online=m.online;U.d=m.district}catch(e){}shell();if(U.role==='cust'||(online&&U.role==='cap'))startGps()}
+async function boot(){tab=U.role==='cust'?'home':U.role==='cap'?'duty':'ad';sig='';try{const m=await api('GET','/api/me');online=m.online;U.d=m.district;U.approved=m.approved}catch(e){}shell();if(U.role==='cust'||(online&&U.role==='cap'))startGps()}
 
 /* ---------- shell ---------- */
 function shell(){const r=U.role;const nv={cust:[['home','🏠','Home'],['map','🗺','Map'],['rooms','🏡','Rooms'],['orders','🧾','Orders'],['acc','👤','Account']],cap:[['duty','🛵','Duty'],['earn','💰','Earnings'],['acc','👤','Account']],admin:[['ad','📊','Dashboard'],['acc','👤','Account']]}[r];
@@ -174,7 +174,8 @@ function draw(){const m=$('#mn');if(!m)return;showMap();m.innerHTML=({home:cHome
 
 /* ---------- customer ---------- */
 const fl=()=>SVC.filter(s=>(cf==='All'||s.cat===cf)&&(!q||(s.en+t(s.en)).toLowerCase().includes(q)));
-const tiles=l=>l.map(s=>`<button class="tile" onclick="book(${s.id})"><i>${s.ic}</i>${t(s.en)}<small>${s.kind==='km'?'₹'+s.perKm+'/km':'₹'+s.base+'+'}</small></button>`).join('')||`<div class="mut">${t('Nothing found')}</div>`;
+const avail=s=>!AV[s.id]||AV[s.id].includes(U.d);
+const tiles=l=>l.map(s=>`<button class="tile" ${avail(s)?'':'style="opacity:.45;filter:grayscale(1)"'} onclick="book(${s.id})"><i>${s.ic}</i>${t(s.en)}<small ${avail(s)?'':'style="color:var(--r)"'}>${avail(s)?(s.kind==='km'?'₹'+s.perKm+'/km':'₹'+s.base+'+'):t('Not available here')}</small></button>`).join('')||`<div class="mut">${t('Nothing found')}</div>`;
 function live(){const o=ACT;if(!o)return'';const ic=icOf(o.service);
  if(o.status==='done')return`<div class="card"><div class="h" style="margin:0">⭐ ${ic} ${t(o.service)} – ₹${o.fare}</div><div class="mut">${t('Rate your captain')}</div><div class="row" style="margin:10px 0">${[1,2,3,4,5].map(i=>`<button style="font-size:30px" onclick="rate(${i})">⭐</button>`).join('')}</div><div class="chips">${[0,20,50,100].map(v=>`<button class="chip" onclick="rate(5,${v})">${t('Tip')} ₹${v}</button>`).join('')}</div></div>`;
  const k=ACTIVE.concat('done').indexOf(o.status);const msg=o.status==='search'?t('Finding a captain…'):o.status==='accepted'?`${o.capName||'Captain'} ${t('is on the way')}`:o.status==='arrived'?t('Captain arrived'):t('Work in progress');
@@ -190,7 +191,7 @@ const row=(a,b,top)=>`<div class="row" ${top?'style="border-top:1px solid var(--
 function fareBox(s){if(s.kind==='km'){if(!QUOTE||QUOTE.id!==s.id)return`<div class="mut">${t('Choose drop on map first')}</div>`;return row(t('Base fare'),'₹'+QUOTE.base)+row(t('Estimated distance')+': '+QUOTE.km+' km','₹'+QUOTE.dist)+row(t('Hill route')+' ('+U.d+')','₹'+QUOTE.terrain)+row('<b>'+t('Total')+'</b>','₹'+QUOTE.fare,1)}
  const f=fareOf(s.base,U.d);return row(t('Base fare'),'₹'+f.base)+row(t('Hill route')+' ('+U.d+')','₹'+f.t)+row('<b>'+t('Total')+'</b>','₹'+f.fare,1)}
 const fareNow=s=>s.kind==='km'?(QUOTE&&QUOTE.id===s.id?QUOTE.fare:null):fareOf(s.base,U.d).fare;
-function book(id){const s=SVC[id],km=s.kind==='km',fa=fareNow(s);
+function book(id){const s=SVC[id],km=s.kind==='km',fa=fareNow(s);if(!avail(s)){toast(t('Not available in')+' '+U.d);return}
  sheet(`<div class="h" style="margin-top:0">${s.ic} ${t(s.en)}</div>
  <div class="row" style="margin:6px 0"><span class="mut">📍 ${t('Pickup location')}: ${t(PICK?'Map pin':myPos?'Your GPS location':'District centre')}</span><button class="chip" onclick="window._ad=$('#ad').value;closeS();startPick('pick',${id})">🗺 ${t('Change on map')}</button></div>
  <input id="ad" placeholder="${t('Address / landmark')}" value="${window._ad||''}">
@@ -228,7 +229,7 @@ function acc(){return`<div class="card"><b style="font-size:18px">${esc(U.name)}
 function startGps(){if(!navigator.geolocation||gpsId!==null)return;gpsId=navigator.geolocation.watchPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude};paintMe()},()=>{},{enableHighAccuracy:true,maximumAge:3000})}
 function stopGps(){if(gpsId!==null){navigator.geolocation.clearWatch(gpsId);gpsId=null}rmk('me')}
 async function setOnline(v){try{if(v){startGps();if(!myPos)locate()}await api('POST','/api/captain/online',{online:v,district:U.d});online=v;if(!v)stopGps();sig='';draw()}catch(e){fail(e)}}
-function capDuty(){const j=JOB;return`<div class="card row"><div><b style="font-size:18px">${t(online?'You are Online':'You are Offline')}</b><div class="mut">${online?U.d+' '+t('jobs are coming'):t('Go online to get requests')}</div></div><button class="sw ${online?'on':''}" onclick="setOnline(${!online})"></button></div>${online&&!myPos?`<div class="card" style="border:2px solid var(--r)">📡 ${t('Turn on location to get jobs')}</div>`:''}${j?jobCard(j):online?`<div class="card" style="text-align:center"><div class="pulse">📡</div>${t('Waiting for requests…')}</div>`:''}`}
+function capDuty(){const j=JOB;return`<div class="card row"><div><b style="font-size:18px">${t(online?'You are Online':'You are Offline')}</b><div class="mut">${online?U.d+' '+t('jobs are coming'):t('Go online to get requests')}</div></div><button class="sw ${online?'on':''}" onclick="setOnline(${!online})"></button></div>${U.approved===false?`<div class="card" style="border:2px solid var(--y)">⏳ ${t('Waiting for admin approval')}</div>`:''}${online&&!myPos?`<div class="card" style="border:2px solid var(--r)">📡 ${t('Turn on location to get jobs')}</div>`:''}${j?jobCard(j):online?`<div class="card" style="text-align:center"><div class="pulse">📡</div>${t('Waiting for requests…')}</div>`:''}`}
 function jobCard(o){const k=['accepted','arrived','started'].indexOf(o.status),ic=icOf(o.service);
  return`<div class="card" style="border:2px solid var(--y)"><div class="row"><b>${ic} ${t(o.service)}</b><b>₹${o.fare}</b></div><div class="mut">📍 ${esc(o.address)}, ${o.district} · ${t(o.when||'Now')} · ${t(o.pay||'UPI')}</div>${o.km?`<div class="mut">🏁 ${esc(o.daddr||'')} · ${o.km} km</div>`:''}<div class="row" style="margin:10px 0">${['Accepted','Arrived','Work'].map((s,i)=>`<div class="step ${i<k?'d':i===k?'c':''}"><i>${i<k?'✓':i+1}</i>${t(s)}</div>`).join('')}</div>
  ${o.status==='accepted'?`<div class="mut" style="margin-bottom:8px">${t('ETA')} ~${ROUTE?ROUTE.min:o.etaMin} min${ROUTE?' · '+ROUTE.km+' km':''}</div><button class="btn y" onclick="jobAct('arrive')">📍 ${t('I have arrived')}</button>`:''}
@@ -248,10 +249,10 @@ async function loadEarn(){try{const e=await api('GET','/api/captain/earnings');c
 function admin(){return`<div id="ab"><div class="mut">…</div></div>`}
 async function loadAdmin(){try{const [s,l]=await Promise.all([api('GET','/api/admin/stats'),api('GET','/api/admin/ledger')]);
  $('#ab').innerHTML=`<div class="h" style="margin-top:0">${t('Dashboard')}</div><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div class="card"><div class="mut">${t('Total booking value')}</div><b style="font-size:22px">₹${s.gmv}</b></div><div class="card" style="background:var(--y);color:#111"><div style="font-size:13px">${t('WorkNow earnings (8%)')}</div><b style="font-size:22px">₹${s.commission}</b></div><div class="card"><div class="mut">${t('Completed')}</div><b style="font-size:22px">${s.completed}</b></div><div class="card"><div class="mut">${t('Active orders')} / Online</div><b style="font-size:22px">${s.activeOrders} / ${s.captainsOnline}</b></div></div>
- <div class="h">${t('District-wise commission')}</div><div class="card">${Object.keys(s.byDistrict).map(d=>`<div class="row"><span>${d}</span><b>₹${s.byDistrict[d]}</b></div>`).join('')||'—'}</div><div class="h">${t('Ledger')}</div><div class="card"><table><tr><th>ID</th><th>${t('District')}</th><th>${t('Fare')}</th><th>8%</th><th>${t('Payout')}</th></tr>${l.slice(0,15).map(x=>`<tr><td>${x.id}</td><td>${x.d}</td><td>₹${x.fare}</td><td>₹${x.comm}</td><td>₹${x.net}</td></tr>`).join('')}</table></div>`}catch(e){}}
+ <div class="h">${t('District-wise commission')}</div><div class="card">${Object.keys(s.byDistrict).map(d=>`<div class="row"><span>${d}</span><b>₹${s.byDistrict[d]}</b></div>`).join('')||'—'}</div><div class="h">${t('Ledger')}</div><div class="card"><table><tr><th>ID</th><th>${t('District')}</th><th>${t('Fare')}</th><th>8%</th><th>${t('Payout')}</th></tr>${l.slice(0,15).map(x=>`<tr><td>${x.id}</td><td>${x.d}</td><td>₹${x.fare}</td><td>₹${x.comm}</td><td>₹${x.net}</td></tr>`).join('')}</table></div><div id="ac"></div>`;loadAdmin2()}catch(e){}}
 
 /* ---------- live loop ---------- */
-async function tick(force){if(!U||!tok)return;tickN++;try{
+async function tick(force){if(!U||!tok)return;tickN++;if(tickN%10===0)loadAv();try{
  if(U.role==='cust'){ORD=await api('GET','/api/orders/mine');ACT=ORD.find(x=>ACTIVE.includes(x.status)||(x.status==='done'&&!x.rated))||null;
   const s=JSON.stringify(ORD.map(x=>x.id+x.status+x.rated+(x.otp||'')));if(s!==sig||force){sig=s;(force||canRedraw())&&draw()}
   if(ACT&&['accepted','arrived','started'].includes(ACT.status)){const tr=await api('GET',`/api/orders/${ACT.id}/track`);clearMk('n');mkr('job',tr.job.lng,tr.job.lat,'📍');if(ACT.dlat)mkr('drop',ACT.dlng,ACT.dlat,'🏁');
@@ -266,5 +267,13 @@ async function tick(force){if(!U||!tok)return;tickN++;try{
  }catch(e){}}
 setInterval(tick,3000);
 
-(async function init(){try{[DISTS,SVC]=await Promise.all([api('GET','/api/districts'),api('GET','/api/services')]);try{CFG=await api('GET','/api/config');if(CFG.googleMapsKey)await loadGoogle(CFG.googleMapsKey)}catch(e){}}catch(e){document.getElementById('app').innerHTML='<div style="padding:30px">Server not reachable. Start it with: node server.js</div>';return}
+(async function init(){try{[DISTS,SVC]=await Promise.all([api('GET','/api/districts'),api('GET','/api/services')]);try{AV=await api('GET','/api/availability')}catch(e){}try{CFG=await api('GET','/api/config');if(CFG.googleMapsKey)await loadGoogle(CFG.googleMapsKey)}catch(e){}}catch(e){document.getElementById('app').innerHTML='<div style="padding:30px">Server not reachable. Start it with: node server.js</div>';return}
  U&&tok?boot():login()})();
+
+async function loadAv(){try{AV=await api('GET','/api/availability')}catch(e){}}
+async function capOk(p,v){try{await api('POST','/api/admin/captain',{phone:p,approved:v});loadAdmin2()}catch(e){fail(e)}}
+async function avSet(id,d,on){try{await api('POST','/api/admin/availability',{serviceId:id,district:d,on});await loadAv();loadAdmin2()}catch(e){fail(e)}}
+async function loadAdmin2(){try{const [cp,av]=await Promise.all([api('GET','/api/admin/captains'),api('GET','/api/admin/availability')]);const sv=SVC[avSel],on=av[avSel]||[];
+ $('#ac').innerHTML=`<div class="h">Captains</div><div class="card">${cp.map(x=>`<div class="row" style="margin-bottom:6px"><span>${esc(x.name)} · ${x.phone} · ${x.district}${x.online?' 🟢':''}</span><button class="chip ${x.approved?'on':''}" onclick="capOk('${x.phone}',${!x.approved})">${x.approved?'Approved ✓':'Approve'}</button></div>`).join('')||'—'}</div>
+ <div class="h">Service availability</div><div class="chips" style="margin-bottom:8px">${SVC.map(s=>`<button class="chip ${s.id===avSel?'on':''}" onclick="avSel=${s.id};loadAdmin2()">${s.ic}</button>`).join('')}</div>
+ <div class="card"><b>${sv.ic} ${sv.en}</b><div class="chips" style="flex-wrap:wrap;margin-top:8px">${DISTS.map(d=>`<button class="chip ${on.includes(d.name)?'on':''}" onclick="avSet(${avSel},'${d.name}',${!on.includes(d.name)})">${d.name}</button>`).join('')}</div></div>`}catch(e){}}
