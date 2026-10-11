@@ -9,7 +9,10 @@ const DIST={'Dehradun':1,'Haridwar':1,'Udham Singh Nagar':1,'Nainital':1.2,'Paur
 const ICONS=['🧹','🔧','⚡','🪚','🎨','❄️','💇','🐜','🍳','🧺','🏍️','🛺','🚕','🚚','🛒','📦','💊','🔥','💧','📚','💻','📸','🎒','🚜','⛰️','👵','🎪','🛕','🍎','🪔'];
 const DC={'Dehradun':[30.32,78.03],'Haridwar':[29.95,78.16],'Udham Singh Nagar':[28.98,79.40],'Nainital':[29.39,79.46],'Pauri Garhwal':[30.15,78.77],'Tehri Garhwal':[30.38,78.43],'Almora':[29.60,79.66],'Bageshwar':[29.84,79.77],'Champawat':[29.33,80.09],'Rudraprayag':[30.28,78.98],'Pithoragarh':[29.58,80.22],'Chamoli':[30.41,79.33],'Uttarkashi':[30.73,78.44]};
 const inUK=(a,b)=>a>28.6&&a<31.6&&b>77.4&&b<81.2;
-const SERVICES=[['Home cleaning','घर की सफाई',250,'H'],['Plumber','प्लंबर',200,'H'],['Electrician','इलेक्ट्रीशियन',200,'H'],['Carpenter','बढ़ई',300,'H'],['Painter','पेंटर',500,'H'],['AC / Geyser repair','AC / गीज़र मरम्मत',350,'H'],['Salon at home','घर पर सैलून',400,'H'],['Pest control','कीट नियंत्रण',600,'H'],['Cook','रसोइया',300,'H'],['Laundry pickup','लॉन्ड्री पिकअप',120,'H'],['Bike taxi','बाइक टैक्सी',40,'R'],['Auto','ऑटो',60,'R'],['Hill taxi','पहाड़ी टैक्सी',150,'R'],['Mini truck','मिनी ट्रक',350,'R'],['Groceries','किराना',40,'E'],['Parcel','पार्सल',60,'E'],['Medicine','दवाई',50,'E'],['Gas cylinder','गैस सिलेंडर',60,'E'],['Water tanker','पानी टैंकर',400,'E'],['Tuition','ट्यूशन',150,'S'],['Data entry','डेटा एंट्री',300,'S'],['Event photos','इवेंट फ़ोटो',500,'S'],['Porter','कुली',150,'U'],['Farm labour','खेत मज़दूर',450,'U'],['Trek guide','ट्रेक गाइड',800,'U'],['Elder care','बुज़ुर्ग देखभाल',600,'U'],['Mela / wedding help','मेला / शादी सहायक',500,'U'],['Yatra helper','यात्रा सहायक',400,'U'],['Mandi fruit & veg','मंडी से फल-सब्ज़ी',90,'U'],['Pandit / puja','पंडित / पूजा',700,'U']].map((s,i)=>({id:i,ic:ICONS[i],en:s[0],hi:s[1],base:s[2],cat:s[3]}));
+const KM={10:[20,8,30],11:[30,12,40],12:[50,16,80],13:[150,25,200],15:[30,9,40]}; /* serviceId:[base, per km, minimum fare] in Rs - edit to your real city rates */
+const hav=(a,b,c,d)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
+const roadKm=(a,b,c,d)=>+(hav(a,b,c,d)*1.4).toFixed(1); /* straight line x 1.4 = approx road distance in hills */
+const SERVICES=[['Home cleaning','घर की सफाई',250,'H'],['Plumber','प्लंबर',200,'H'],['Electrician','इलेक्ट्रीशियन',200,'H'],['Carpenter','बढ़ई',300,'H'],['Painter','पेंटर',500,'H'],['AC / Geyser repair','AC / गीज़र मरम्मत',350,'H'],['Salon at home','घर पर सैलून',400,'H'],['Pest control','कीट नियंत्रण',600,'H'],['Cook','रसोइया',300,'H'],['Laundry pickup','लॉन्ड्री पिकअप',120,'H'],['Bike taxi','बाइक टैक्सी',40,'R'],['Auto','ऑटो',60,'R'],['Hill taxi','पहाड़ी टैक्सी',150,'R'],['Mini truck','मिनी ट्रक',350,'R'],['Groceries','किराना',40,'E'],['Parcel','पार्सल',60,'E'],['Medicine','दवाई',50,'E'],['Gas cylinder','गैस सिलेंडर',60,'E'],['Water tanker','पानी टैंकर',400,'E'],['Tuition','ट्यूशन',150,'S'],['Data entry','डेटा एंट्री',300,'S'],['Event photos','इवेंट फ़ोटो',500,'S'],['Porter','कुली',150,'U'],['Farm labour','खेत मज़दूर',450,'U'],['Trek guide','ट्रेक गाइड',800,'U'],['Elder care','बुज़ुर्ग देखभाल',600,'U'],['Mela / wedding help','मेला / शादी सहायक',500,'U'],['Yatra helper','यात्रा सहायक',400,'U'],['Mandi fruit & veg','मंडी से फल-सब्ज़ी',90,'U'],['Pandit / puja','पंडित / पूजा',700,'U']].map((s,i)=>({id:i,ic:ICONS[i],en:s[0],hi:s[1],base:KM[i]?KM[i][0]:s[2],cat:s[3],kind:KM[i]?'km':'fixed',perKm:KM[i]?KM[i][1]:0,minFare:KM[i]?KM[i][2]:0}));
 
 /* ---------- storage (JSON file, atomic write) ---------- */
 let db={users:{},orders:[],ledger:[],rooms:[],otps:{},secret:crypto.randomBytes(32).toString('hex')};
@@ -31,14 +34,16 @@ function unsign(t){const [b,s]=String(t||'').split('.');if(!b||!s)return null;co
 class HttpErr extends Error{constructor(c,m){super(m);this.code=c}}
 const bad=(c,m)=>{throw new HttpErr(c,m)};
 const today=()=>new Date().toDateString();
-const priceOf=(svc,d)=>{const t=Math.round(svc.base*(DIST[d]-1)*.5/5)*5;return{base:svc.base,terrain:t,fare:svc.base+t}};
+const priceOf=(svc,d,km)=>{if(svc.kind!=='km'){const t=Math.round(svc.base*(DIST[d]-1)*.5/5)*5;return{base:svc.base,dist:0,terrain:t,fare:svc.base+t}}const road=svc.perKm*km,t=Math.round(road*(DIST[d]-1)*.5);return{base:svc.base,dist:Math.round(road),terrain:t,fare:Math.max(svc.minFare,Math.round(svc.base+road+t))}};
+const radiusKm=o=>{const a=(Date.now()-o.at)/1000;return a<30?3:a<60?6:a<90?10:15}; /* search widens: 3 km, 6, 10, then 15 */
+const freshLoc=u=>!!(u&&u.loc&&Date.now()-u.loc.at<120000);
 const etaMin=d=>Math.round(8*DIST[d]);
 const rate={};function limit(key,max,ms){const n=Date.now(),a=(rate[key]||[]).filter(t=>n-t<ms);if(a.length>=max)bad(429,'Too many attempts, try later');a.push(n);rate[key]=a}
 function sendSms(phone,otp){console.log(`[SMS stub] OTP for ${phone}: ${otp}`)} /* plug MSG91 / Twilio here when OTP_MODE=sms */
 
 /* ---------- views: commission is never exposed to customers/captains ---------- */
-function view(o,role){const v={id:o.id,service:o.svc,district:o.d,address:o.addr,when:o.when,pay:o.pay,status:o.st,createdAt:o.at,capName:o.capName||null,lat:role==='cap'&&o.st==='search'?+o.lat.toFixed(2):o.lat,lng:role==='cap'&&o.st==='search'?+o.lng.toFixed(2):o.lng};
- if(role==='cust'){v.fare=o.fare;v.breakdown={base:o.base,terrain:o.terrain};if(['accepted','arrived'].includes(o.st))v.otp=o.otp;if(o.st==='accepted')v.etaMin=etaMin(o.d);v.rated=!!o.rated}
+function view(o,role){const v={id:o.id,service:o.svc,district:o.d,address:o.addr,when:o.when,pay:o.pay,status:o.st,createdAt:o.at,capName:o.capName||null,km:o.km||0,daddr:o.daddr||'',dlat:o.dlat,dlng:o.dlng,lat:role==='cap'&&o.st==='search'?+o.lat.toFixed(2):o.lat,lng:role==='cap'&&o.st==='search'?+o.lng.toFixed(2):o.lng};
+ if(role==='cust'){v.fare=o.fare;v.breakdown={base:o.base,distance:o.dist||0,terrain:o.terrain};if(o.st==='search')v.searchKm=radiusKm(o);if(['accepted','arrived'].includes(o.st))v.otp=o.otp;if(o.st==='accepted')v.etaMin=etaMin(o.d);v.rated=!!o.rated}
  else if(role==='cap'){v.fare=o.fare;v.youEarn=o.fare-Math.round(o.fare*COMMISSION);if(o.st==='accepted')v.etaMin=etaMin(o.d)}
  else Object.assign(v,{fare:o.fare,commission:o.comm||Math.round(o.fare*COMMISSION),cust:o.cust,cap:o.cap||null});return v}
 
@@ -60,6 +65,7 @@ setInterval(()=>{if(!BOT)return;let ch=0;const n=Date.now();db.orders.forEach(o=
 /* ---------- routes ---------- */
 const R=[];const route=(m,p,roles,fn)=>R.push({m,re:new RegExp('^'+p.replace(/:(\w+)/g,'(?<$1>[^/]+)')+'$'),roles,fn});
 route('GET','/api/health',null,()=>({ok:true,commissionPct:undefined,time:Date.now()}));
+route('GET','/api/config',null,()=>({googleMapsKey:process.env.GOOGLE_MAPS_KEY||null}));
 route('GET','/api/districts',null,()=>Object.keys(DIST).map(n=>({name:n,factor:DIST[n],lat:DC[n][0],lng:DC[n][1]})));
 route('GET','/api/services',null,()=>SERVICES);
 
@@ -77,8 +83,11 @@ route('POST','/api/auth/verify',null,(c)=>{const {phone:ph,otp,name,role,distric
 route('POST','/api/orders',['cust'],(c)=>{const {serviceId,address,when,pay,district}=c.body;const svc=SERVICES[serviceId];if(!svc)bad(400,'Unknown service');
  const d=district||db.users[c.ph].district;if(!DIST[d])bad(400,'Unknown district');if(!String(address||'').trim())bad(400,'Address required');
  if(db.orders.some(o=>o.cust===c.ph&&['search','accepted','arrived','started'].includes(o.st)))bad(409,'You already have an active booking');
- limit('book'+c.ph,10,3600000);const p=priceOf(svc,d);let lat=+c.body.lat,lng=+c.body.lng;if(!inUK(lat,lng)){lat=DC[d][0];lng=DC[d][1]}
- const o={id:'WN'+crypto.randomInt(10000,99999),sid:svc.id,svc:svc.en,base:p.base,terrain:p.terrain,fare:p.fare,d,addr:String(address).slice(0,200),when:['Now','Today evening','Tomorrow'].includes(when)?when:'Now',pay:pay==='Cash'?'Cash':'UPI',cust:c.ph,lat,lng,st:'search',otp:String(crypto.randomInt(1000,10000)),otpTries:0,at:Date.now(),skip:[]};
+ limit('book'+c.ph,10,3600000);
+ let lat=+c.body.lat,lng=+c.body.lng;if(c.body.lat==null||c.body.lng==null){lat=DC[d][0];lng=DC[d][1]}else if(!inUK(lat,lng))bad(400,'Service is only available in Uttarakhand');
+ let km=0,dLat,dLng;if(svc.kind==='km'){dLat=+c.body.dLat;dLng=+c.body.dLng;if(!inUK(dLat,dLng))bad(400,'Choose a drop location inside Uttarakhand');km=roadKm(lat,lng,dLat,dLng);if(km<0.2)bad(400,'Drop is too close to pickup')}
+ const p=priceOf(svc,d,km);
+ const o={id:'WN'+crypto.randomInt(10000,99999),sid:svc.id,svc:svc.en,base:p.base,dist:p.dist,terrain:p.terrain,fare:p.fare,km,dlat:dLat,dlng:dLng,daddr:String(c.body.daddr||'').slice(0,200),d,addr:String(address).slice(0,200),when:['Now','Today evening','Tomorrow'].includes(when)?when:'Now',pay:pay==='Cash'?'Cash':'UPI',cust:c.ph,lat,lng,st:'search',otp:String(crypto.randomInt(1000,10000)),otpTries:0,at:Date.now(),skip:[]};
  db.orders.unshift(o);save();return view(o,'cust')});
 route('GET','/api/orders/mine',['cust'],c=>db.orders.filter(o=>o.cust===c.ph).slice(0,50).map(o=>view(o,'cust')));
 route('POST','/api/orders/:id/cancel',['cust'],c=>{const o=find(c,'cust');if(!['search','accepted'].includes(o.st))bad(409,'Cannot cancel now');
@@ -89,10 +98,14 @@ function find(c,role){const o=db.orders.find(x=>x.id===c.params.id);if(!o)bad(40
 
 /* captain */
 route('POST','/api/captain/online',['cap'],c=>{const u=db.users[c.ph];u.online=!!c.body.online;if(c.body.district&&DIST[c.body.district])u.district=c.body.district;save();return{online:u.online,district:u.district}});
-route('GET','/api/captain/offers',['cap'],c=>{const u=db.users[c.ph];if(!u.online||activeJob(c.ph))return[];return db.orders.filter(o=>o.st==='search'&&o.d===u.district&&!o.skip.includes(c.ph)).slice(0,5).map(o=>view(o,'cap'))});
+route('POST','/api/quote',['cust'],c=>{const svc=SERVICES[c.body.serviceId];if(!svc)bad(400,'Unknown service');const d=DIST[c.body.district]?c.body.district:db.users[c.ph].district;let km=0;
+ if(svc.kind==='km'){if(!inUK(+c.body.lat,+c.body.lng)||!inUK(+c.body.dLat,+c.body.dLng))bad(400,'Service is only available in Uttarakhand');km=roadKm(+c.body.lat,+c.body.lng,+c.body.dLat,+c.body.dLng)}return Object.assign({km},priceOf(svc,d,km))});
+/* offers = only jobs near the captain's live GPS, nearest first (radius 3 km -> 6 -> 10 -> 15 as the search ages) */
+route('GET','/api/captain/offers',['cap'],c=>{const u=db.users[c.ph];if(!u.online||activeJob(c.ph)||!freshLoc(u))return[];
+ return db.orders.filter(o=>o.st==='search'&&!o.skip.includes(c.ph)).map(o=>({o,d:hav(u.loc.lat,u.loc.lng,o.lat,o.lng)})).filter(x=>x.d<=radiusKm(x.o)).sort((a,b)=>a.d-b.d).slice(0,5).map(x=>Object.assign(view(x.o,'cap'),{distKm:+x.d.toFixed(1)}))});
 route('GET','/api/captain/job',['cap'],c=>{const o=activeJob(c.ph);return o?view(o,'cap'):null});
 route('POST','/api/orders/:id/accept',['cap'],c=>{const u=db.users[c.ph],o=db.orders.find(x=>x.id===c.params.id);if(!o)bad(404,'Order not found');if(!u.online)bad(409,'Go online first');if(activeJob(c.ph))bad(409,'Finish your current job first');
- if(o.d!==u.district)bad(403,'Different district');if(o.st!=='search')bad(409,'Taken by someone else'); /* single-threaded: this check+set is atomic */
+ if(!freshLoc(u))bad(409,'Turn on your location first');if(hav(u.loc.lat,u.loc.lng,o.lat,o.lng)>radiusKm(o))bad(403,'Job is too far from you');if(o.st!=='search')bad(409,'Taken by someone else'); /* single-threaded: this check+set is atomic */
  o.st='accepted';o.cap=c.ph;o.capName=u.name;o.acceptedAt=Date.now();save();return view(o,'cap')});
 route('POST','/api/orders/:id/skip',['cap'],c=>{const o=db.orders.find(x=>x.id===c.params.id);if(o&&!o.skip.includes(c.ph))o.skip.push(c.ph);save();return{ok:true}});
 route('POST','/api/orders/:id/arrive',['cap'],c=>{const o=find(c,'cap');if(o.st!=='accepted')bad(409,'Wrong state');o.st='arrived';save();return view(o,'cap')});

@@ -63,7 +63,7 @@ table{width:100%;font-size:12px;border-collapse:collapse}td,th{padding:6px 3px;b
 /* WorkNow web app: talks to the real API (same origin) */
 const $=s=>document.querySelector(s);
 let lang=localStorage.getItem('wn_l')||'en';
-Object.assign(HI,{'Allow location access':'लोकेशन की अनुमति दें','Use my location':'मेरी लोकेशन','Work location = map pin. Move the map to set it.':'काम की जगह = नक्शे का पिन। नक्शा खिसकाकर चुनें।','Captain is live on map':'कैप्टन नक्शे पर लाइव है','Admin key':'एडमिन की','Name':'नाम','Continue':'आगे बढ़ें','Server error, try again':'सर्वर में दिक्कत, फिर कोशिश करें','Change':'बदलें','Open':'खुला','Choose':'चुनें','Map':'नक्शा','Captains nearby':'पास में कैप्टन','Pick work location':'काम की जगह चुनें','Confirm location':'लोकेशन पक्की करें','Location set':'लोकेशन तय हो गई','Move the map under the pin':'नक्शा खिसकाकर पिन सही जगह लाएँ','Change on map':'नक्शे पर बदलें','Your GPS location':'आपकी GPS लोकेशन','Map pin':'नक्शे का पिन','District centre':'ज़िले का केंद्र'});
+Object.assign(HI,{'Allow location access':'लोकेशन की अनुमति दें','Use my location':'मेरी लोकेशन','Work location = map pin. Move the map to set it.':'काम की जगह = नक्शे का पिन। नक्शा खिसकाकर चुनें।','Captain is live on map':'कैप्टन नक्शे पर लाइव है','Admin key':'एडमिन की','Name':'नाम','Continue':'आगे बढ़ें','Server error, try again':'सर्वर में दिक्कत, फिर कोशिश करें','Change':'बदलें','Open':'खुला','Choose':'चुनें','Map':'नक्शा','Captains nearby':'पास में कैप्टन','Pick work location':'काम की जगह चुनें','Confirm location':'लोकेशन पक्की करें','Location set':'लोकेशन तय हो गई','Move the map under the pin':'नक्शा खिसकाकर पिन सही जगह लाएँ','Change on map':'नक्शे पर बदलें','Your GPS location':'आपकी GPS लोकेशन','Map pin':'नक्शे का पिन','District centre':'ज़िले का केंद्र','Drop location':'ड्रॉप लोकेशन','Choose on map':'नक्शे पर चुनें','Drop address / landmark':'ड्रॉप का पता / लैंडमार्क','Choose drop on map first':'पहले नक्शे पर ड्रॉप चुनें','Service is only in Uttarakhand':'सेवा सिर्फ़ उत्तराखंड में है','km away':'किमी दूर','Estimated distance':'अनुमानित दूरी','Turn on location to get jobs':'काम पाने के लिए लोकेशन चालू करें','Pickup location':'पिकअप लोकेशन'});
 const t=k=>(lang==='hi'&&HI[k])||k;
 const DAYS={en:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],hi:['रवि','सोम','मंगल','बुध','गुरु','शुक्र','शनि']};
 let tok=localStorage.getItem('wn_tok'),U=null,DISTS=[],SVC=[],tab='home',cf='All',q='',rf='All',rd='my',bw='Now',bp='UPI',sig='',ls=1,LR='cust',LP='',LN='',LD='Dehradun',ORD=[],ACT=null,OFFERS=[],JOB=null,online=false,myPos=null,gpsId=null,tickN=0,fitKey='';
@@ -133,13 +133,15 @@ async function routeTo(a,b){if(!map||!a||!b)return;const key=[a.lat.toFixed(3),a
  if(drawLine(pts))routeKey=key}
 function clearRoute(){routeKey='';ROUTE=null;if(!map)return;if(useG){routeLine&&routeLine.setMap(null);routeLine=null}else if(map.getSource&&map.getSource('route'))map.getSource('route').setData({type:'FeatureCollection',features:[]})}
 function locate(cb){if(!navigator.geolocation){toast(t('Allow location access'));return}navigator.geolocation.getCurrentPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude};paintMe();flyTo(myPos.lng,myPos.lat,15);cb&&cb()},()=>toast(t('Allow location access')),{enableHighAccuracy:true,timeout:9000})}
-function startPick(){pickMode=true;go('map')}
-function confirmPick(){PICK=getC();pickMode=false;go('home');toast(t('Location set'))}
+const inUK=(a,b)=>a>28.6&&a<31.6&&b>77.4&&b<81.2;
+let DROP=null,QUOTE=null,pickFor={type:'pick',svc:null};
+function startPick(type,svc){pickFor={type:type||'pick',svc:svc==null?null:svc};pickMode=true;go('map')}
+function confirmPick(){const p=getC();if(!p||!inUK(p.lat,p.lng)){toast(t('Service is only in Uttarakhand'));return}if(pickFor.type==='drop')DROP=p;else PICK=p;QUOTE=null;pickMode=false;go('home');toast(t('Location set'));if(pickFor.svc!=null)setTimeout(()=>book(pickFor.svc),250)}
 function mapCard(){if(ACT)return live();
  if(pickMode)return`<div class="card"><b>📍 ${t('Move the map under the pin')}</b><div class="row" style="margin-top:8px"><button class="btn o" onclick="pickMode=false;go('home')">${t('Cancel')}</button><button class="btn y" onclick="confirmPick()">${t('Confirm location')}</button></div></div>`;
  return`<div class="card"><div class="row"><b>🛵 ${t('Captains nearby')}: ${NEAR.length}</b><button class="chip on" onclick="startPick()">📍 ${t('Pick work location')}</button></div><div class="mut" style="margin-top:6px">🔵 ${t('Your GPS location')}</div></div>`}
 function showMap(){const w=$('#mapwrap');if(!w)return;const cust=U.role==='cust',full=cust&&tab==='map',on=full||(U.role==='cap'&&tab==='duty');
- w.classList.toggle('on',on);w.classList.toggle('full',full);$('#mn').style.display=full?'none':'block';$('#xh').style.display=(full&&pickMode)?'block':'none';
+ w.classList.toggle('on',on);w.classList.toggle('full',full);$('#mn').style.display=full?'none':'block';$('#xh').style.display=(full&&pickMode)?'block':'none';$('#xh').textContent=pickFor.type==='drop'?'🏁':'📍';
  const cd=$('#mapcard');cd.style.display=full?'block':'none';if(full){const h=mapCard();if(h!==lastCard){lastCard=h;cd.innerHTML=h}}
  if(on&&map)setTimeout(mapResize,50)}
 
@@ -172,7 +174,7 @@ function draw(){const m=$('#mn');if(!m)return;showMap();m.innerHTML=({home:cHome
 
 /* ---------- customer ---------- */
 const fl=()=>SVC.filter(s=>(cf==='All'||s.cat===cf)&&(!q||(s.en+t(s.en)).toLowerCase().includes(q)));
-const tiles=l=>l.map(s=>`<button class="tile" onclick="book(${s.id})"><i>${s.ic}</i>${t(s.en)}<small>₹${s.base}+</small></button>`).join('')||`<div class="mut">${t('Nothing found')}</div>`;
+const tiles=l=>l.map(s=>`<button class="tile" onclick="book(${s.id})"><i>${s.ic}</i>${t(s.en)}<small>${s.kind==='km'?'₹'+s.perKm+'/km':'₹'+s.base+'+'}</small></button>`).join('')||`<div class="mut">${t('Nothing found')}</div>`;
 function live(){const o=ACT;if(!o)return'';const ic=icOf(o.service);
  if(o.status==='done')return`<div class="card"><div class="h" style="margin:0">⭐ ${ic} ${t(o.service)} – ₹${o.fare}</div><div class="mut">${t('Rate your captain')}</div><div class="row" style="margin:10px 0">${[1,2,3,4,5].map(i=>`<button style="font-size:30px" onclick="rate(${i})">⭐</button>`).join('')}</div><div class="chips">${[0,20,50,100].map(v=>`<button class="chip" onclick="rate(5,${v})">${t('Tip')} ₹${v}</button>`).join('')}</div></div>`;
  const k=ACTIVE.concat('done').indexOf(o.status);const msg=o.status==='search'?t('Finding a captain…'):o.status==='accepted'?`${o.capName||'Captain'} ${t('is on the way')}`:o.status==='arrived'?t('Captain arrived'):t('Work in progress');
@@ -184,13 +186,26 @@ function cHome(){return`${live()}<input id="qi" placeholder="🔍 ${t('What do y
 <div class="ban"><div><b>${t('Hill work, every village')}</b><span>${t('Verified captains in all 13 districts')}</span></div><div onclick="go('rooms')"><b>${t('Rent or list a room')}</b><span>${t('Rooms, flats, PG and homestays')}</span></div><div><b>${t('Your city, your jobs')}</b><span>${t('Students earn with skills near them')}</span></div></div>
 ${chipRow(CATS,cf,'setCf')}<div class="h">${t('Services')}</div><div class="grid" id="sg">${tiles(fl())}</div>`}
 const setCf=c=>{cf=c;draw()};
-function book(id){const s=SVC[id],f=fareOf(s.base,U.d);
- sheet(`<div class="h" style="margin-top:0">${s.ic} ${t(s.en)}</div><input id="ad" placeholder="${t('Address / landmark')}" value="${window._ad||''}"><div class="row" style="margin:8px 0"><span class="mut">📍 ${t(PICK?'Map pin':myPos?'Your GPS location':'District centre')}</span><button class="chip" onclick="closeS();startPick()">🗺 ${t('Change on map')}</button></div><div class="mut" style="margin:10px 0 4px">${t('When')}</div>${chipRow([['Now','Now'],['Today evening','Today evening'],['Tomorrow','Tomorrow']],bw,'setW')}<div class="mut" style="margin:8px 0 4px">${t('Payment')}</div>${chipRow([['UPI','UPI'],['Cash','Cash']],bp,'setP')}
- <div class="card" style="margin-top:10px"><div class="row"><span>${t('Base fare')}</span><b>₹${f.base}</b></div><div class="row"><span>${t('Hill route')} (${U.d})</span><b>₹${f.t}</b></div><div class="row" style="border-top:1px solid var(--l);margin-top:6px;padding-top:6px"><b>${t('Total')}</b><b>₹${f.fare}</b></div></div><p class="mut">${t('Cancel is free before a captain accepts, ₹20 after.')}</p><button class="btn y" onclick="confirmBook(${id})">${t('Book now')} – ₹${f.fare}</button>`)}
+const row=(a,b,top)=>`<div class="row" ${top?'style="border-top:1px solid var(--l);margin-top:6px;padding-top:6px"':''}><span>${a}</span><b>${b}</b></div>`;
+function fareBox(s){if(s.kind==='km'){if(!QUOTE||QUOTE.id!==s.id)return`<div class="mut">${t('Choose drop on map first')}</div>`;return row(t('Base fare'),'₹'+QUOTE.base)+row(t('Estimated distance')+': '+QUOTE.km+' km','₹'+QUOTE.dist)+row(t('Hill route')+' ('+U.d+')','₹'+QUOTE.terrain)+row('<b>'+t('Total')+'</b>','₹'+QUOTE.fare,1)}
+ const f=fareOf(s.base,U.d);return row(t('Base fare'),'₹'+f.base)+row(t('Hill route')+' ('+U.d+')','₹'+f.t)+row('<b>'+t('Total')+'</b>','₹'+f.fare,1)}
+const fareNow=s=>s.kind==='km'?(QUOTE&&QUOTE.id===s.id?QUOTE.fare:null):fareOf(s.base,U.d).fare;
+function book(id){const s=SVC[id],km=s.kind==='km',fa=fareNow(s);
+ sheet(`<div class="h" style="margin-top:0">${s.ic} ${t(s.en)}</div>
+ <div class="row" style="margin:6px 0"><span class="mut">📍 ${t('Pickup location')}: ${t(PICK?'Map pin':myPos?'Your GPS location':'District centre')}</span><button class="chip" onclick="window._ad=$('#ad').value;closeS();startPick('pick',${id})">🗺 ${t('Change on map')}</button></div>
+ <input id="ad" placeholder="${t('Address / landmark')}" value="${window._ad||''}">
+ ${km?`<div class="row" style="margin:10px 0 6px"><span class="mut">🏁 ${t('Drop location')}: ${DROP?'✓':'—'}</span><button class="chip on" onclick="window._ad=$('#ad').value;window._da=$('#da').value;closeS();startPick('drop',${id})">🗺 ${t('Choose on map')}</button></div><input id="da" placeholder="${t('Drop address / landmark')}" value="${window._da||''}">`:''}
+ <div class="mut" style="margin:10px 0 4px">${t('When')}</div>${chipRow([['Now','Now'],['Today evening','Today evening'],['Tomorrow','Tomorrow']],bw,'setW')}<div class="mut" style="margin:8px 0 4px">${t('Payment')}</div>${chipRow([['UPI','UPI'],['Cash','Cash']],bp,'setP')}
+ <div class="card" style="margin-top:10px" id="fq">${fareBox(s)}</div><p class="mut">${t('Cancel is free before a captain accepts, ₹20 after.')}</p><button id="bb" class="btn y" onclick="confirmBook(${id})">${t('Book now')}${fa?' – ₹'+fa:''}</button>`);
+ if(km&&DROP&&!(QUOTE&&QUOTE.id===id))getQuote(id)}
+async function getQuote(id){const p=PICK||myPos||dist(U.d);try{const r=await api('POST','/api/quote',{serviceId:id,district:U.d,lat:p.lat,lng:p.lng,dLat:DROP.lat,dLng:DROP.lng});QUOTE=Object.assign(r,{id});if($('#fq')&&$('#bb')){$('#fq').innerHTML=fareBox(SVC[id]);$('#bb').textContent=t('Book now')+' – ₹'+r.fare}}catch(e){fail(e)}}
 function setW(v){bw=v;rebook()}function setP(v){bp=v;rebook()}
-function rebook(){window._ad=$('#ad').value;book(+$('#sb').innerHTML.match(/confirmBook\((\d+)\)/)[1])}
-async function confirmBook(id){const a=$('#ad').value.trim();if(!a){toast(t('Enter address'));return}const c=PICK||myPos;
- try{await api('POST','/api/orders',{serviceId:id,address:a,when:bw,pay:bp,district:U.d,lat:c&&c.lat,lng:c&&c.lng});window._ad='';closeS();toast(t('Request sent'));await tick(true)}catch(e){fail(e)}}
+function rebook(){window._ad=$('#ad').value;if($('#da'))window._da=$('#da').value;book(+$('#sb').innerHTML.match(/confirmBook\((\d+)\)/)[1])}
+async function confirmBook(id){const s=SVC[id],a=$('#ad').value.trim();if(!a){toast(t('Enter address'));return}const c=PICK||myPos;
+ if(c&&!inUK(c.lat,c.lng)){toast(t('Service is only in Uttarakhand'));return}
+ const body={serviceId:id,address:a,when:bw,pay:bp,district:U.d,lat:c&&c.lat,lng:c&&c.lng};
+ if(s.kind==='km'){if(!DROP){toast(t('Choose drop on map first'));return}body.dLat=DROP.lat;body.dLng=DROP.lng;body.daddr=($('#da').value||'').trim()}
+ try{await api('POST','/api/orders',body);window._ad='';window._da='';DROP=null;QUOTE=null;closeS();toast(t('Request sent'));await tick(true)}catch(e){fail(e)}}
 async function cancel(id){try{await api('POST',`/api/orders/${id}/cancel`);toast(t('Cancelled'));await tick(true)}catch(e){fail(e)}}
 async function rate(n,v){try{await api('POST',`/api/orders/${ACT.id}/rate`,{rating:n,tip:v||0});toast(t('Thank you!')+' '+n+'⭐');await tick(true)}catch(e){fail(e)}}
 function cOrders(){return`<div class="h" style="margin-top:0">${t('My bookings')}</div><div id="ol"></div>`}
@@ -213,16 +228,16 @@ function acc(){return`<div class="card"><b style="font-size:18px">${esc(U.name)}
 function startGps(){if(!navigator.geolocation||gpsId!==null)return;gpsId=navigator.geolocation.watchPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude};paintMe()},()=>{},{enableHighAccuracy:true,maximumAge:3000})}
 function stopGps(){if(gpsId!==null){navigator.geolocation.clearWatch(gpsId);gpsId=null}rmk('me')}
 async function setOnline(v){try{if(v){startGps();if(!myPos)locate()}await api('POST','/api/captain/online',{online:v,district:U.d});online=v;if(!v)stopGps();sig='';draw()}catch(e){fail(e)}}
-function capDuty(){const j=JOB;return`<div class="card row"><div><b style="font-size:18px">${t(online?'You are Online':'You are Offline')}</b><div class="mut">${online?U.d+' '+t('jobs are coming'):t('Go online to get requests')}</div></div><button class="sw ${online?'on':''}" onclick="setOnline(${!online})"></button></div>${j?jobCard(j):online?`<div class="card" style="text-align:center"><div class="pulse">📡</div>${t('Waiting for requests…')}</div>`:''}`}
+function capDuty(){const j=JOB;return`<div class="card row"><div><b style="font-size:18px">${t(online?'You are Online':'You are Offline')}</b><div class="mut">${online?U.d+' '+t('jobs are coming'):t('Go online to get requests')}</div></div><button class="sw ${online?'on':''}" onclick="setOnline(${!online})"></button></div>${online&&!myPos?`<div class="card" style="border:2px solid var(--r)">📡 ${t('Turn on location to get jobs')}</div>`:''}${j?jobCard(j):online?`<div class="card" style="text-align:center"><div class="pulse">📡</div>${t('Waiting for requests…')}</div>`:''}`}
 function jobCard(o){const k=['accepted','arrived','started'].indexOf(o.status),ic=icOf(o.service);
- return`<div class="card" style="border:2px solid var(--y)"><div class="row"><b>${ic} ${t(o.service)}</b><b>₹${o.fare}</b></div><div class="mut">📍 ${esc(o.address)}, ${o.district} · ${t(o.when||'Now')} · ${t(o.pay||'UPI')}</div><div class="row" style="margin:10px 0">${['Accepted','Arrived','Work'].map((s,i)=>`<div class="step ${i<k?'d':i===k?'c':''}"><i>${i<k?'✓':i+1}</i>${t(s)}</div>`).join('')}</div>
+ return`<div class="card" style="border:2px solid var(--y)"><div class="row"><b>${ic} ${t(o.service)}</b><b>₹${o.fare}</b></div><div class="mut">📍 ${esc(o.address)}, ${o.district} · ${t(o.when||'Now')} · ${t(o.pay||'UPI')}</div>${o.km?`<div class="mut">🏁 ${esc(o.daddr||'')} · ${o.km} km</div>`:''}<div class="row" style="margin:10px 0">${['Accepted','Arrived','Work'].map((s,i)=>`<div class="step ${i<k?'d':i===k?'c':''}"><i>${i<k?'✓':i+1}</i>${t(s)}</div>`).join('')}</div>
  ${o.status==='accepted'?`<div class="mut" style="margin-bottom:8px">${t('ETA')} ~${ROUTE?ROUTE.min:o.etaMin} min${ROUTE?' · '+ROUTE.km+' km':''}</div><button class="btn y" onclick="jobAct('arrive')">📍 ${t('I have arrived')}</button>`:''}
  ${o.status==='arrived'?`<div class="mut">${t('Ask customer for the 4 digit OTP')}</div>${otpIn()}<button class="btn y" onclick="startJob()">${t('Start work')}</button>`:''}
  ${o.status==='started'?`<div class="card" style="background:var(--bg)"><div class="row"><b>${t('You earn')}</b><b style="color:var(--g)">₹${o.youEarn}</b></div></div><button class="btn y" onclick="jobAct('complete')">✅ ${t('Complete job')}</button>`:''}</div>`}
 async function jobAct(a){try{const r=await api('POST',`/api/orders/${JOB.id}/${a}`);if(a==='complete')toast('₹'+r.youEarn+' '+t('added to your account'));await tick(true)}catch(e){fail(e)}}
 async function startJob(){const v=otpVal();try{await api('POST',`/api/orders/${JOB.id}/start`,{otp:v});await tick(true)}catch(e){fail(e)}}
 function reqPop(){const e=$('#rq');const o=OFFERS[0];if(U.role!=='cap'||!online||JOB||!o){e&&e.remove();return}if(e&&e.dataset.id===o.id)return;e&&e.remove();try{navigator.vibrate&&navigator.vibrate([300,100,300])}catch(x){}
- $('#app').insertAdjacentHTML('beforeend',`<div class="card req" id="rq" data-id="${o.id}" style="border:2px solid var(--y);box-shadow:0 14px 34px #0007"><div style="color:#d97706;font-weight:800">⚡ ${t('New job nearby')}</div><div class="row"><b style="font-size:19px">${icOf(o.service)} ${t(o.service)}</b><b style="font-size:19px">₹${o.fare}</b></div><div class="mut">${esc(o.address)} · ${t('You earn')} ₹${o.youEarn}</div><div class="row" style="margin-top:10px"><button class="btn o" onclick="skipR('${o.id}')">${t('Skip')}</button><button class="btn y" onclick="acceptR('${o.id}')">${t('Accept')}</button></div></div>`)}
+ $('#app').insertAdjacentHTML('beforeend',`<div class="card req" id="rq" data-id="${o.id}" style="border:2px solid var(--y);box-shadow:0 14px 34px #0007"><div style="color:#d97706;font-weight:800">⚡ ${t('New job nearby')}</div><div class="row"><b style="font-size:19px">${icOf(o.service)} ${t(o.service)}</b><b style="font-size:19px">₹${o.fare}</b></div><div class="mut">📍 ${o.distKm} ${t('km away')} · ${esc(o.address)}${o.km?` · 🏁 ${o.km} km`:''} · ${t('You earn')} ₹${o.youEarn}</div><div class="row" style="margin-top:10px"><button class="btn o" onclick="skipR('${o.id}')">${t('Skip')}</button><button class="btn y" onclick="acceptR('${o.id}')">${t('Accept')}</button></div></div>`)}
 async function skipR(id){try{await api('POST',`/api/orders/${id}/skip`);OFFERS=OFFERS.filter(x=>x.id!==id);reqPop()}catch(e){fail(e)}}
 async function acceptR(id){try{await api('POST',`/api/orders/${id}/accept`);$('#rq')&&$('#rq').remove();await tick(true)}catch(e){fail(e);OFFERS=[];reqPop()}}
 function capEarn(){return`<div class="h" style="margin-top:0">${t('Earnings')}</div><div id="eb"></div>`}
@@ -239,15 +254,15 @@ async function loadAdmin(){try{const [s,l]=await Promise.all([api('GET','/api/ad
 async function tick(force){if(!U||!tok)return;tickN++;try{
  if(U.role==='cust'){ORD=await api('GET','/api/orders/mine');ACT=ORD.find(x=>ACTIVE.includes(x.status)||(x.status==='done'&&!x.rated))||null;
   const s=JSON.stringify(ORD.map(x=>x.id+x.status+x.rated+(x.otp||'')));if(s!==sig||force){sig=s;(force||canRedraw())&&draw()}
-  if(ACT&&['accepted','arrived','started'].includes(ACT.status)){const tr=await api('GET',`/api/orders/${ACT.id}/track`);clearMk('n');mkr('job',tr.job.lng,tr.job.lat,'📍');
+  if(ACT&&['accepted','arrived','started'].includes(ACT.status)){const tr=await api('GET',`/api/orders/${ACT.id}/track`);clearMk('n');mkr('job',tr.job.lng,tr.job.lat,'📍');if(ACT.dlat)mkr('drop',ACT.dlng,ACT.dlat,'🏁');
    if(tr.captain){mkr('cap',tr.captain.lng,tr.captain.lat,'🛵');const fk=ACT.id+ACT.status;if(map&&fk!==fitKey){fitKey=fk;fitPts([[tr.job.lng,tr.job.lat],[tr.captain.lng,tr.captain.lat]])}
     if(ACT.status!=='started')await routeTo(tr.captain,tr.job);else clearRoute()}}
-  else{rmk('job');rmk('cap');clearRoute();if(!ACT&&Date.now()-lastNear>8000){lastNear=Date.now();NEAR=await api('GET','/api/captains/nearby');clearMk('n');NEAR.forEach((c,i)=>mkr('n'+i,c.lng,c.lat,'🛵'))}}
+  else{rmk('job');rmk('cap');rmk('drop');clearRoute();if(!ACT&&Date.now()-lastNear>8000){lastNear=Date.now();NEAR=await api('GET','/api/captains/nearby');clearMk('n');NEAR.forEach((c,i)=>mkr('n'+i,c.lng,c.lat,'🛵'))}}
   showMap()}
  if(U.role==='cap'){if(myPos&&online&&tickN%2===0)api('POST','/api/captain/location',myPos).catch(()=>{});
   JOB=await api('GET','/api/captain/job');OFFERS=online&&!JOB?await api('GET','/api/captain/offers'):[];
   const s=JSON.stringify([JOB&&JOB.status,JOB&&JOB.id,online,OFFERS.length]);if(s!==sig||force){sig=s;(force||canRedraw())&&draw()}
-  clearMk('o');OFFERS.forEach(o=>mkr('o'+o.id,o.lng,o.lat,'📍'));if(JOB){mkr('job',JOB.lng,JOB.lat,'📍');if(JOB.status==='accepted'&&myPos)routeTo(myPos,JOB);else clearRoute()}else{rmk('job');clearRoute()}reqPop()}
+  clearMk('o');OFFERS.forEach(o=>mkr('o'+o.id,o.lng,o.lat,'📍'));if(JOB){mkr('job',JOB.lng,JOB.lat,'📍');if(JOB.dlat)mkr('drop',JOB.dlng,JOB.dlat,'🏁');if(JOB.status==='accepted'&&myPos)routeTo(myPos,JOB);else clearRoute()}else{rmk('job');rmk('drop');clearRoute()}reqPop()}
  }catch(e){}}
 setInterval(tick,3000);
 
